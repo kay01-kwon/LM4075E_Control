@@ -9,7 +9,7 @@
 #include <unistd.h>
 #include <lm4075e_control/dmc_definition.h>
 
-unsigned int delay_usec = 100;
+unsigned int delay_usec = 10;
 
 using serial::Serial;
 using std_msgs::Float32;
@@ -58,6 +58,9 @@ class DMC_Protocol{
 
     pos_vel_data data;
 
+    uint8_t packet[12];
+    uint8_t packet_;
+
 };
 
 DMC_Protocol::DMC_Protocol()
@@ -92,9 +95,12 @@ int DMC_Protocol::serial_open(const std::__cxx11::string & filename, uint32_t ba
 
 void DMC_Protocol::PositionCallback(const std_msgs::Float32::ConstPtr & msg)
 {
+    std::cout<<"Position Control"<<std::endl;
     PositionControl(ID1,msg->data);
-    //PositionRequest(ID1);
-    //PositionRead();
+    std::cout<<"Request"<<std::endl;
+    PositionRequest(ID1);
+    PositionRead();
+    std::cout<<"\n";
 }
 
 void DMC_Protocol::FactorRest(uint8_t id)
@@ -230,16 +236,15 @@ void DMC_Protocol::PositionRead()
     pos_vel_data data;
     int packet_size = 12;
     int idx = 0;
-    uint8_t packet[packet_size];
-    uint8_t packet_;
 
-    int16_t data1;
-    int16_t data2;
-    int16_t result1;
 
-    int16_t data3;
-    int16_t data4;
-    int16_t result2;
+    uint16_t data1;
+    uint16_t data2;
+    uint16_t result1;
+
+    uint16_t data3;
+    uint16_t data4;
+    uint16_t result2;
 
     while(ser.available())
     {
@@ -252,17 +257,17 @@ void DMC_Protocol::PositionRead()
         idx++;
     }
     ser.flush();
-    for (int i = 0; i < packet_size;i++)
-        std::cout<<std::hex<<(unsigned)packet[i]<<"  ";
-    std::cout<<"\n";
+//    for (int i = 0; i < packet_size;i++)
+//        std::cout<<std::hex<<(unsigned)packet[i]<<"  ";
+//    std::cout<<"\n";
     // Position Data(Degree)    
-    data1 = (int16_t) packet[7];
-    data2 = (int16_t) packet[8];
+    data1 = (uint16_t) packet[7];
+    data2 = (uint16_t) packet[8];
     result1 = (data1<<8) + data2;
 
     // Velocity Data(RPM)
-    data3 = (int16_t) packet[9];
-    data4 = (int16_t) packet[10];
+    data3 = (uint16_t) packet[9];
+    data4 = (uint16_t) packet[10];
     result2 = (data3<<8) + data4;
 
     data.id = packet[2];
@@ -272,7 +277,7 @@ void DMC_Protocol::PositionRead()
     data.velocity = (float) 0.1*result2;
     data.current = 100.0*packet[11];
 
-    if (packet[6] == 0x00)
+    if (packet[6] == 0x01)
         data.position = (float)-data.position;
     
     std::cout<<"Position data: "<<data.position<<std::endl;
