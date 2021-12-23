@@ -22,6 +22,8 @@ const uint8_t ReductionSetMode = 0x0B;
 const uint8_t ResponseTimeSetMode = 0x08;
 const uint8_t ControlOnSetMode = 0x0C;
 const uint8_t PositionControlSetMode = 0x04;
+const uint8_t AbsolutePositionControl = 0x00;
+const uint8_t PositionControlSetMode13 = 0x0D;
 
 // Init Mode
 const uint8_t PosInitMode = 0x0F;
