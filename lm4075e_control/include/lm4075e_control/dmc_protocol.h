@@ -369,7 +369,7 @@ void DMC_Protocol::PositionControlSet(uint8_t id)
     Ki = 0xFE;
     Kd = 0xFE;
     current = 0x50;
-    crc = ~(id + data_size6 + PositionControlSetMode+ Kp + Ki + Kd);
+    crc = ~(id + data_size6 + PositionControlSetMode+ Kp + Ki + Kd + current);
     ser.write(&H1,1);
     ser.write(&H2,1);
     ser.write(&id,1);
