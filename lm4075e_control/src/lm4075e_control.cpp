@@ -4,7 +4,7 @@ int main(int argc,char** argv)
 {
     ros::init(argc,argv,"Test");
     
-    uint8_t ResponseTime = 0x05;
+    uint8_t ResponseTime = 0x01;
 
     uint16_t CPR = 16;
     uint16_t ReductionRatio = 191;
