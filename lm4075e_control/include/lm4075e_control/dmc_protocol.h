@@ -9,8 +9,8 @@
 #include <unistd.h>
 #include <lm4075e_control/dmc_definition.h>
 #include <lm4075e_control/packet_info.h>
+useconds_t delay_usec = 10;
 
-unsigned int delay_usec = 200;
 
 using serial::Serial;
 using std_msgs::Float32;
@@ -21,7 +21,7 @@ class DMC_Protocol{
     // Constructor
     DMC_Protocol();
     
-    int serial_open(const std::__cxx11::string & filename,uint32_t baudrate);
+    void serial_open(const std::__cxx11::string & filename,uint32_t baudrate);
     
     void PositionCallback(const std_msgs::Float32::ConstPtr & msg);
     void FactorRest(uint8_t id);
@@ -34,14 +34,13 @@ class DMC_Protocol{
     void ResponseTimeSet(uint8_t id, uint8_t response_time);
     void PositionControlModeSet(uint8_t id, uint8_t ControlMode);
 
-    void PositionRequest(uint8_t id);
-    void PositionRead();
+    void FeedbackRequest(uint8_t id, uint8_t RequestMode);
+    void SerialRead();
+    void PingFeedback();
+    void PositionFeedback();
 
     void VelocityRequest(uint8_t id);
     void VelocityRead();
-
-    void ReductionRequest(uint8_t id);
-    void ReductionRead();
 
     void ControlOnSet(uint8_t id);
     void PositionControlSet(uint8_t id);
@@ -59,9 +58,6 @@ class DMC_Protocol{
     
     Serial ser;
 
-    uint8_t packet[12];
-    uint8_t packet_;
-
     pos_vel_data data;
 
 };
@@ -71,87 +67,81 @@ DMC_Protocol::DMC_Protocol()
     position_data_subscriber = nh.subscribe("Position",1,&DMC_Protocol::PositionCallback,this);
 }
 
-int DMC_Protocol::serial_open(const std::__cxx11::string & filename, uint32_t baudrate)
+void DMC_Protocol::serial_open(const std::__cxx11::string & filename, uint32_t baudrate)
 {
     try
     {
         ser.setPort(filename);
         ser.setBaudrate(baudrate);
-        serial::Timeout to = serial::Timeout::simpleTimeout(10);
+        serial::Timeout to = serial::Timeout::simpleTimeout(5);
         ser.setTimeout(to);
         ser.open();
-        return 0;
     }
     catch(serial::IOException& e)
     {
         ROS_ERROR_STREAM("Unable to open port");
-        return -1;
     }
 
     if(ser.isOpen())
+    
     {
         ROS_INFO_STREAM("Serial Port Initialized");
-    }else{
-        return -1;
     }
+    else{
+
+    }
+
 }
 
 void DMC_Protocol::PositionCallback(const std_msgs::Float32::ConstPtr & msg)
 {
-    ControlOnSet(ID1);
-    std::cout<<"Position Control"<<std::endl;
     PositionControl(ID1,msg->data);
-    std::cout<<"Request"<<std::endl;
-    PositionRequest(ID1);
-    PositionRead();
-    std::cout<<"\n";
+    FeedbackRequest(ID1,RequestPos);
+    SerialRead();
+    PositionFeedback();
 }
 
 void DMC_Protocol::FactorRest(uint8_t id)
 {
-    uint8_t data_size = 0x02;
     uint8_t crc;
     crc = 0x00;
-    crc = ~(id + data_size + FactoryMode);
-    std::cout<<"Factor Reset"<<std::endl;
+    crc = ~(id + data_size2 + FactoryMode);
     ser.write(&H1,1);
     ser.write(&H2,1);
     ser.write(&id,1);
-    ser.write(&data_size,1);
+    ser.write(&data_size2,1);
     ser.write(&crc,1);
     ser.write(&FactoryMode,1);
     ser.flush();
     usleep(delay_usec);
+    std::cout<<"Factor Reset"<<std::endl;
 }
 
 void DMC_Protocol::PositionReset(uint8_t id)
 {
-    uint8_t data_size = 0x02;
-
     uint8_t crc;
     crc = 0x00;
-    crc = ~(id + data_size + PosInitMode);
-    std::cout<<"Position Reset"<<std::endl;
+    crc = ~(id + data_size2 + PosInitMode);
     ser.write(&H1,1);
     ser.write(&H2,1);
     ser.write(&id,1);
-    ser.write(&data_size,1);
+    ser.write(&data_size2,1);
     ser.write(&crc,1);
     ser.write(&PosInitMode,1);
     ser.flush();
     usleep(delay_usec);
+    std::cout<<"Position Reset"<<std::endl;
 }
 
 void DMC_Protocol::BaudrateSet(uint8_t id, uint8_t baudrate)
 {
-    uint8_t data_size = 0x03;
     uint8_t crc;
     crc = 0x00;
-    crc = ~(id + data_size + BaudrateSetMode + baudrate);
+    crc = ~(id + data_size3 + BaudrateSetMode + baudrate);
     ser.write(&H1,1);
     ser.write(&H2,1);
     ser.write(&id,1);
-    ser.write(&data_size,1);
+    ser.write(&data_size3,1);
     ser.write(&crc,1);
     ser.write(&BaudrateSetMode,1);
     ser.write(&baudrate,1);
@@ -161,17 +151,16 @@ void DMC_Protocol::BaudrateSet(uint8_t id, uint8_t baudrate)
 
 void DMC_Protocol::ResolutionSet(uint8_t id, uint16_t resolution)
 {
-    uint8_t data_size = 0x04;
     uint8_t crc;
     crc = 0x00;
-    uint8_t resolution_low = resolution;
-    uint8_t resolution_high = uint8_t (resolution<<8);
-    crc = ~(id + data_size + ResolutionSetMode + resolution_low + resolution_high);
+    resolution_low = resolution;
+    resolution_high = uint8_t (resolution<<8);
+    crc = ~(id + data_size4 + ResolutionSetMode + resolution_low + resolution_high);
     std::cout<<"Resolution Set: "<<(unsigned)resolution<<std::endl;
     ser.write(&H1,1);
     ser.write(&H2,1);
     ser.write(&id,1);
-    ser.write(&data_size,1);
+    ser.write(&data_size4,1);
     ser.write(&crc,1);
     ser.write(&ResolutionSetMode,1);
     ser.write(&resolution_high,1);
@@ -182,17 +171,16 @@ void DMC_Protocol::ResolutionSet(uint8_t id, uint16_t resolution)
 
 void DMC_Protocol::ReductionSet(uint8_t id, uint16_t ratio)
 {
-    uint8_t data_size = 0x04;
     uint8_t crc;
     crc = 0x00;
-    uint8_t ratio_low = ratio;
-    uint8_t ratio_high = uint8_t (ratio>>8);
-    crc = ~(id + data_size + ReductionSetMode + ratio_low + ratio_high);
+    ratio_low = ratio;
+    ratio_high = uint8_t (ratio>>8);
+    crc = ~(id + data_size4 + ReductionSetMode + ratio_low + ratio_high);
     std::cout<<"Reduction Ratio Set: "<<(unsigned)ratio<<std::endl;
     ser.write(&H1,1);
     ser.write(&H2,1);
     ser.write(&id,1);
-    ser.write(&data_size,1);
+    ser.write(&data_size4,1);
     ser.write(&crc,1);
     ser.write(&ReductionSetMode,1);
     ser.write(&ratio_high,1);
@@ -234,114 +222,56 @@ void DMC_Protocol::PositionControlModeSet(uint8_t id, uint8_t ControlMode)
     usleep(delay_usec);
 }
 
-void DMC_Protocol::PositionRequest(uint8_t id)
+void DMC_Protocol::FeedbackRequest(uint8_t id, uint8_t RequestMode)
 {
     uint8_t crc;
     crc = 0x00;
-    crc = ~(id + data_size2 + RequestPos);
-
+    crc = ~(id + data_size2 + RequestMode);
     ser.write(&H1,1);
     ser.write(&H2,1);
     ser.write(&id,1);
     ser.write(&data_size2,1);
     ser.write(&crc,1);
-    ser.write(&RequestPos,1);
+    ser.write(&RequestMode,1);
     ser.flush();
-    usleep(delay_usec);    
 }
 
-void DMC_Protocol::PositionRead()
+void DMC_Protocol::SerialRead()
 {
     int idx = 0;
-
-    uint16_t data1;
-    uint16_t data2;
-    uint16_t result1;
-
-    uint16_t data3;
-    uint16_t data4;
-    uint16_t result2;
-
-    while(ser.available())
-    {
-        ser.read(&position_packet_,1);
-
-        if(idx == position_feedback_packet_size)
-            break;
-
-        position_packet[idx] = position_packet_;
-        idx++;
-    }
-    ser.flush();
-    
-    for (int i = 0; i < position_feedback_packet_size;i++)
-        std::cout<<std::hex<<(unsigned)position_packet[i]<<"  ";
-    std::cout<<"\n";
-    
-    // Position Data(Degree)    
-    data1 = (uint16_t) position_packet[7];
-    data2 = (uint16_t) position_packet[8];
-    result1 = (data1<<8) + data2;
-
-    // Velocity Data(RPM)
-    data3 = (uint16_t) position_packet[9];
-    data4 = (uint16_t) position_packet[10];
-    result2 = (data3<<8) + data4;
-
-    data.id = position_packet[2];
-    data.velocity_direction = position_packet[6];
-    data.position = (float) result1;
-    data.position = 0.01 * data.position;
-    data.velocity = (float) 0.1*result2;
-    data.current = 100.0*position_packet[11];
-
-    if (packet[6] == 0x01)
-        data.position = (float)-data.position;
-    
-    std::cout<<"Position data: "<<data.position<<std::endl;
-
-}
-
-
-void DMC_Protocol::ReductionRequest(uint8_t id)
-{
-    uint8_t data_size = 0x02;
-    uint8_t crc;
-    crc = 0x00;
-    crc = ~(id + data_size + RequestRed);
-
-    ser.write(&H1,1);
-    ser.write(&H2,1);
-    ser.write(&id,1);
-    ser.write(&data_size,1);
-    ser.write(&crc,1);
-    ser.write(&RequestRed,1);
-    ser.flush();
-}
-
-void DMC_Protocol::ReductionRead()
-{
-    int packet_size = 9;
-    int idx = 0;
-    uint8_t packet[packet_size];
-    uint8_t packet_;
-
     while(ser.available())
     {
         ser.read(&packet_,1);
-        if(idx == packet_size)
-            break;
-
         packet[idx] = packet_;
-        
         idx++;
     }
-
-    for (int i = 0; i < packet_size;i++)
+    ser.flush();
+    
+    for (int i = 0; i < 12;i++)
         std::cout<<std::hex<<(unsigned)packet[i]<<"  ";
     std::cout<<"\n";
-
 }
+
+void DMC_Protocol::PositionFeedback()
+{
+    // Position Data(Degree)
+    position_data16 = (packet[7]<<8) | packet[8];
+
+    // Velocity Data(RPM)
+    velocity_data16 = (packet[9]<<8) | packet[10];
+
+    data.id = packet[2];
+    data.velocity_direction = packet[6];
+    data.position = (float) position_data16;
+    data.position = 0.01 * data.position;
+    data.velocity = (float) 0.1*velocity_data16;
+    data.current = 100.0*packet[11];
+
+    if (packet[6] == 0x01)
+        data.position = (float)-data.position;
+}
+
+
 
 void DMC_Protocol::ControlOnSet(uint8_t id)
 {
@@ -365,11 +295,11 @@ void DMC_Protocol::PositionControlSet(uint8_t id)
 {
     uint8_t crc;
     uint8_t Kp, Ki, Kd, current;
-    Kp = 0xFE;
-    Ki = 0xFE;
-    Kd = 0xFE;
-    current = 0x50;
-    crc = ~(id + data_size6 + PositionControlSetMode+ Kp + Ki + Kd + current);
+    Kp = 0xA0;
+    Ki = 0x0A;
+    Kd = 0x50;
+    current = 0x70;
+    crc = ~(id + data_size6 + PositionControlSetMode + Kp + Ki + Kd + current);
     ser.write(&H1,1);
     ser.write(&H2,1);
     ser.write(&id,1);
@@ -382,7 +312,6 @@ void DMC_Protocol::PositionControlSet(uint8_t id)
     ser.write(&current,1);
     ser.flush();
     usleep(delay_usec);    
-
 }
 
 void DMC_Protocol::PositionControl(uint8_t id, float position)
@@ -390,7 +319,7 @@ void DMC_Protocol::PositionControl(uint8_t id, float position)
     uint8_t crc;
 
     crc = 0x00;
-    position_data = uint16_t (abs(position*100));
+    position_data = (uint16_t) abs(position);
     position_data_l = (uint8_t) position_data;
     position_data_h = (uint8_t) (position_data>>8);
     
@@ -423,6 +352,7 @@ void DMC_Protocol::PositionControl(uint8_t id, float position)
     ser.flush();
     usleep(delay_usec);
 
+    //std::cout<<"Position data: "<<position<<std::endl;
 }
 
 void DMC_Protocol::VelocityControl(uint8_t id,float velocity)
@@ -460,7 +390,7 @@ void DMC_Protocol::VelocityControl(uint8_t id,float velocity)
     ser.write(&velocity_data_l,1);
     ser.write(&time,1);
     ser.flush();
-    usleep(delay_usec);
+    //usleep(delay_usec);
 }
 
 DMC_Protocol::~DMC_Protocol()

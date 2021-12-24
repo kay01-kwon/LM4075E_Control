@@ -26,18 +26,21 @@ uint16_t velocity_data = 0x0000;
 const uint8_t RPM_h = 0x03;
 const uint8_t RPM_l = 0xEB;
 
-// Position feedback
-int position_feedback_packet_size = 12;
-uint8_t position_packet[12];
-uint8_t position_packet_;
-
-uint8_t velocity_h, velocity_l;
+uint8_t packet[12];
+uint8_t packet_;
 
 
-uint16_t position_data_H, position_data_L;
-
+// Position feedback data
+uint16_t velocity_data16;
+uint16_t position_data16;
 pos_vel_data data;
 
+// Resolution ratio
+uint8_t resolution_low;
+uint8_t resolution_high;
 
+// Reduction ratio
+uint8_t ratio_low;
+uint8_t ratio_high;
 
 #endif
