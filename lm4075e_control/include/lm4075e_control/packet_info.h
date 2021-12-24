@@ -24,7 +24,7 @@ uint16_t position_data = 0x0000;
 uint16_t velocity_data = 0x0000;
 
 const uint8_t RPM_h = 0x03;
-const uint8_t RPM_l = 0xEB;
+const uint8_t RPM_l = 0xE8;
 
 uint8_t packet[12];
 uint8_t packet_;

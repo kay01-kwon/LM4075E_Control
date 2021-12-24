@@ -21,17 +21,21 @@ int main(int argc,char** argv)
 
 
     //dmc_protocol.FactorRest(ID1);
+    
     dmc_protocol.BaudrateSet(ID1,Baudrate115200);
     dmc_protocol.PositionReset(ID1);
     dmc_protocol.ResolutionSet(ID1,CPR);
     dmc_protocol.ReductionSet(ID1,ReductionRatio);
     dmc_protocol.ResponseTimeSet(ID1,ResponseTime);
-
     dmc_protocol.PositionControlModeSet(ID1,AbsolutePositionControl);
     dmc_protocol.PositionControlSet(ID1);
     dmc_protocol.ControlOnSet(ID1);
 
-    dmc_protocol.FeedbackRequest(ID1,RequestPing);
+    dmc_protocol.FeedbackRequest(ID1,RequestPos);
+    dmc_protocol.SerialRead();
+
+    dmc_protocol.PositionFeedback();
+    dmc_protocol.FeedbackRequest(ID1,RequestOnOffFeedback);
     dmc_protocol.SerialRead();
 
     while(ros::ok())
