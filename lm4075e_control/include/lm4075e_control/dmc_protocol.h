@@ -76,7 +76,7 @@ void DMC_Protocol::serial_open(const std::__cxx11::string & filename, uint32_t b
     {
         ser.setPort(filename);
         ser.setBaudrate(baudrate);
-        serial::Timeout to = serial::Timeout::simpleTimeout(5);
+        serial::Timeout to = serial::Timeout::simpleTimeout(3);
         ser.setTimeout(to);
         ser.open();
     }
@@ -102,7 +102,7 @@ void DMC_Protocol::PositionCallback(const std_msgs::Float32::ConstPtr & msg)
     curr_time = ros::Time::now().toSec();
     dt = curr_time - prev_time;
     
-    PositionControl(ID1,msg->data);
+    PositionControl(ID1,msg->data); 
     FeedbackRequest(ID1,RequestPos);
 
     SerialRead();
@@ -313,9 +313,9 @@ void DMC_Protocol::PositionControlSet(uint8_t id)
 {
     uint8_t crc;
     uint8_t Kp, Ki, Kd, current;
-    Kp = 0xA0;
-    Ki = 0x20;
-    Kd = 0x50;
+    Kp = 200;
+    Ki = 20;
+    Kd = 180;
     current = 0x70;
     crc = ~(id + data_size6 + PositionControlSetMode + Kp + Ki + Kd + current);
     ser.write(&H1,1);
@@ -354,7 +354,7 @@ void DMC_Protocol::PositionControl(uint8_t id, float position)
     std::cout<<std::hex<<(unsigned)position_data_l<<std::endl;
 **/    
     crc = ~(id + data_size7 + PositionMode1 + control_direction + position_data_h + position_data_l + RPM_h + RPM_l);
-
+    ser.flush();
     ser.write(&H1,1);
     ser.write(&H2,1);
     ser.write(&id,1);
